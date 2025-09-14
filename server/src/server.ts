@@ -22,10 +22,28 @@ if (!fs.existsSync(uploadsDir)) {
 // Connect to MongoDB
 connectDB();
 
-// Middleware
+// Middleware - configure CORS from environment variable `CORS_ORIGIN`
+const rawOrigins = process.env.CORS_ORIGIN || 'http://localhost:5173,http://localhost:5174';
+const allowedOrigins = rawOrigins.split(',').map(s => s.trim()).filter(Boolean);
+
+// Log allowed origins at startup to help debugging in deployments
+console.log('CORS allowed origins:', allowedOrigins);
+
 app.use(cors({
-  origin: process.env.CLIENT_URL,
-  credentials: true
+  origin: (origin, callback) => {
+    // allow requests with no origin (e.g., curl, mobile apps)
+    if (!origin) return callback(null, true);
+    // Debug log incoming origin on deployed server
+    console.log('CORS request origin:', origin);
+    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    console.warn('CORS origin denied:', origin);
+    return callback(new Error('CORS policy: origin not allowed'), false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json({ limit: '10mb' }));
@@ -59,7 +77,7 @@ app.use(errorHandler);
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📱 Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
+  console.log(`📱 Client URL: ${process.env.CLIENT_URL}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
