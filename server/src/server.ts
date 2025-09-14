@@ -40,8 +40,26 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Ensure preflight requests are handled
-app.options('*', cors());
+// Ensure preflight requests are handled without registering a '*' route
+// Some path-to-regexp versions throw when given '*' as a path. Handle OPTIONS manually.
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    // Create a temporary CORS handler and call it
+    return cors({
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+        return callback(new Error('CORS policy: origin not allowed'), false);
+      },
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization']
+    })(req as any, res as any, next as any);
+  }
+  next();
+});
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
